@@ -1,0 +1,644 @@
+
+  var room = HBInit({ roomName: "♂Classic Football♂[RUS/ENG]", public:true,playerName: "📣" ,maxPlayers: 24 });
+  room.setDefaultStadium("Big");
+  room.setScoreLimit(14);
+  room.setTimeLimit(5);
+
+ 
+
+var goalPts = 3;
+var assistPts = 2;
+var winPts = 5;
+var csPts = 3;
+var losePts = -5;
+var ogPts = 0;
+
+ 
+
+ 
+var boldedNumbers = '𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗';
+var circledNumbers = '🄋⓵⓶⓷⓸⓹⓺⓻⓼⓽';
+
+function boldedNumber(num){
+	var result = '';
+	var reversedDigits = [];
+	do{
+		reversedDigits.push(num % 10);
+		num = Math.floor(num / 10);
+	}while(num > 0);
+	for (var i = reversedDigits.length; i-- > 0; ){
+		result += boldedNumbers.substr(reversedDigits[i]*2, 2);
+	}
+	
+	return result;
+}
+
+function circledNumber(num){
+	var result = '';
+	var reversedDigits = [];
+	do{
+		reversedDigits.push(num % 10);
+		num = Math.floor(num / 10);
+	}while(num > 0);
+	for (var i = reversedDigits.length; i-- > 0; ){
+		if(reversedDigits[i] == 0){
+			result += circledNumbers.substr(reversedDigits[i], 2);
+		}else{
+			result += circledNumbers.substr(1+reversedDigits[i], 1);
+		}
+	}
+	
+	return result;
+}
+ 
+/*
+    Functions
+*/
+// If there are no admins left in the room give admin to one of the remaining players.
+function updateAdmins() {
+  // Get all players except the host (id = 0 is always the host)
+  var players = room.getPlayerList().filter((player) => player.id != 0 );
+  if ( players.length == 0 ) return; // No players left, do nothing.
+  if ( players.find((player) => player.admin) != null ) return; // There's an admin left so do nothing.
+  room.setPlayerAdmin(players[0].id, true); // Give admin to the first non admin player in the list
+}
+ 
+function initPlayerStats(player){
+    if (stats.get(player.name)) return;
+    stats.set(player.name, [0, 0, 0, 0, 0, 0, 0, 0]) // goals, assists, wins, loses, og, cs, games, games on GK
+}
+ 
+ 
+ 
+/*
+for commands
+*/
+ 
+function swapFun(player){
+    if (player.admin == true){
+        if (room.getScores() == null) {
+            players = room.getPlayerList();
+            for (i = 0; i < players.length; i++){
+                if (players[i].team == 1){
+                    room.setPlayerTeam(players[i].id, 2);
+                }
+                else if (players[i].team == 2){
+                    room.setPlayerTeam(players[i].id, 1);
+                }
+            }
+        }
+    }
+	return false;
+}
+ 
+ 
+function pushMuteFun(player, message){ // !mute Anddy
+    // Prevent somebody to talk in the room (uses the nickname, not the id)
+    // need to be admin
+    if (player.admin == true){
+		var mutedPlayer = message.substr(6);
+		
+		
+        if (!(mutedPlayers.includes(mutedPlayer))){
+			mutedPlayers.push(mutedPlayer);
+			room.sendChat('🔇 ' + mutedPlayer + ' has been muted');
+			
+		}
+    }
+	return false;
+}
+ 
+ 
+function gotMutedFun(player){
+    if (mutedPlayers.includes(player.name)){
+        return true;
+    }
+}
+ 
+function unmuteFun(player, message){ // !unmute Anddy
+    // Allow somebody to talk if he has been muted
+    // need to be admin
+    if (player.admin == true){
+		mutedPlayer = message.substr(8);
+        pos = mutedPlayers.indexOf(mutedPlayer);
+        mutedPlayers.splice(pos, 1);
+		room.sendChat('🔈 ' + mutedPlayer + ' has been unmuted');
+    }
+	return false;
+}
+
+function helpFun() { // !help
+    room.sendChat('💬 Available commands: "!stats Nickname", "!ranking", "!poss", "!resetstats", "!adminhelp", "!gkhelp", "!rankhelp"');
+}
+ 
+function adminHelpFun() {
+    room.sendChat('💬 Admin commands: !mute {nick}, !unmute {nick}, ' +
+    '!clearbans, !rr, !resetranking, !reset {nick}, !slot {nick}, !clearslot, !last, !clearlast')
+}
+ 
+function gkHelpFun() { // !gkhelp
+	room.sendChat('💬 The most backward player at the kick off will be set as gk ! (write "!gk" if the bot was wrong).')
+}
+
+function rankHelpFun() { // !rankhelp
+    room.sendChat("💬 Get points by doing good things in this room ! Goal: " + goalPts + " pts, assist: " + assistPts + " pts, win: " + winPts + " pts, lose: " + losePts + " pts, cs: " + csPts + " pts.")
+}
+ 
+ 
+function statsFun(player, message){ // !stats Anddy
+    if (stats.get(message.substr(7))){
+        sendStats(message.substr(7));
+    }
+}
+ 
+function rankFun() { // !ranking
+    string = ranking();
+    room.sendChat("🏆 Ranking: " + string);
+    //room.sendChat("📜 Ranking: " + string);
+}
+
+function resetPlayerStatsFun (player, message){ // !reset Anddy
+	if (player.admin == true){
+		var playerName = message.substr(7);
+		stats.set(playerName, [0,0,0,0,0,0,0,0]);
+		room.sendChat(playerName + "'s stats have been reset ! ")
+	}
+	return false;
+}
+
+function resetStatsFun (player){ // !resetstats
+    if (rankingCalc(player.name) > 0){
+        stats.set(player.name, [0,0,0,0,0,0,0,0]);
+        room.sendChat('Your stats have been reset ! ')
+    }
+    else (room.sendChat('Sorry, you must have positive points to be able to reset it'))
+}
+
+function resetRankingFun(player){
+	if (player.admin == true){
+		var players = room.getPlayerList();
+		for(var i = 0; i < players.length; i++) {
+			stats.set(players[i].name, [0,0,0,0,0,0]);
+		}
+		room.sendChat("Ranking has been reset by admin! ")
+	}
+	return false;
+}
+ 
+function clearFun(player){ // !clear
+    if (player.admin == true){
+		room.clearBans();
+	}
+	return false;
+}
+ 
+function resetFun(player){
+    if (player.admin == true){
+        room.stopGame();
+        room.startGame();
+    }
+	return false;
+}
+
+function gkFun(player){ // !gk
+
+	if (room.getScores() != null && room.getScores().time < 60){
+		if (player.team == 1) {
+			gk[0] = player;
+		}
+		else if (player.team == 2){
+			gk[1] = player;
+		}
+	}
+}
+ 
+var slotReservationNick = '';
+function slotFun(player, message){  // !slot Anddy
+    if (player.admin == true){
+		slotReservationNick = message.substr(6);
+	}
+	return false;
+} 
+
+function clearSlotFun(player){  // !clearslot
+    if (player.admin == true){
+		slotReservationNick = '';
+	}
+	return false;
+} 
+
+var isLastGame = false;
+function lastGameFun(player){
+	if (player.admin == true){
+		isLastGame = true;
+	}
+	return false;
+}
+
+function clearLastGameFun(player){
+	if (player.admin == true){
+		isLastGame = false;
+	}
+	return false;
+}
+ 
+function sendOnlyForAdminMsg(){
+   room.sendChat("⛔ Command available only for admin!");
+}
+
+	
+/*
+    For ranking
+*/
+ 
+function rankingCalc(player){
+    /*return stats.get(player)[0] * 3 + stats.get(player)[1] * 2 +
+            stats.get(player)[2] * 5 + stats.get(player)[5] * 3 -
+            stats.get(player)[3] * 7 - stats.get(player)[4] * 0;*/
+	return stats.get(player)[0] * goalPts + stats.get(player)[1] * assistPts +
+		stats.get(player)[2] * winPts + stats.get(player)[5] * csPts +
+		stats.get(player)[3] * losePts - stats.get(player)[4] * ogPts;
+}
+ 
+function ranking(){
+ 
+    var overall = [];
+    players = Array.from(stats.keys());
+    for (var i = 2; i < players.length; i++) {
+        score = rankingCalc(players[i])
+        // Goal: 3 pts, assist: 2 pts, win: 5 pts, cs: 3 pts, lose: -7 pts, og: 0 pts
+        overall.push({name: players[i], value: score, games: stats.get(players[i])[6]});
+    }
+    overall.sort(function(a,b){
+        return b.value - a.value;
+    })
+    result = '';
+ 
+	var position = 1;
+    for (var i = 0; i < overall.length; i++) {
+		//if(i > 0){
+		//	result += ', ';
+		//}
+        if (overall[i].games > 0){
+			result += circledNumber(position) + ' ' + overall[i].name + ': ' + overall[i].value + ' ';
+			position++;
+        }
+    }
+    return result;
+}
+ 
+function sendStats(name){
+	var ranking = rankingCalc(name);
+    ps = stats.get(name); // stands for playerstats
+    room.sendChat(name + ": goals: " + ps[0] + ", assists: " + ps[1]
+    + ", cs: " + ps[5] + "/" + ps[7] +" , wins: " + ps[2] + ", loses: " + ps[3] +
+    ", points: " + ranking + ", avg: " + (Math.round(100 * ranking/ (ps[6]+ 0.0000001) )/100));
+}
+ 
+ 
+function whichTeam(){ // gives the players in the red or blue team
+    var players = room.getPlayerList();
+    var redTeam = players.filter(player => player.team == 1);
+    var blueTeam = players.filter(player => player.team == 2);
+    return [redTeam, blueTeam]
+}
+
+function isGk(){ // gives the mosts backward players before the first kickOff
+	var players = room.getPlayerList();
+	var min = players[0];
+	min.position = {x: room.getBallPosition().x + 60}
+	var max = min;
+
+	for (var i = 0; i < players.length; i++) {
+		if (players[i].position != null){
+			if (min.position.x > players[i].position.x) min = players[i];
+			if (max.position.x < players[i].position.x) max = players[i];
+		}
+	}
+	return [min, max]
+}
+
+ 
+function updateWinLoseStats(winners, losers){
+    for (var i = 0; i < winners.length; i++) {
+		stats.get(winners[i].name)[2] += 1;  //wins
+		stats.get(winners[i].name)[6] += 1;  // total games
+    }
+    for (var i = 0; i < losers.length; i++) {
+		stats.get(losers[i].name)[3] += 1;  // loses
+		stats.get(losers[i].name)[6] += 1;  // total games
+    }
+}
+ 
+function initBallCarrying(redTeam, blueTeam){
+    var ballCarrying = new Map();
+    var playing = redTeam.concat(blueTeam);
+    for (var i = 0; i < playing.length; i++) {
+        ballCarrying.set(playing[i].name, [0, playing[i].team]); // secs, team, %
+    }
+    return ballCarrying;
+}
+ 
+ 
+ 
+function updateTeamPoss(value){
+    if (value[1] == 1) redPoss += value[0];
+    if (value[1] == 2) bluePoss += value[0];
+}
+ 
+var bluePoss;
+var redPoss;
+var timeOnHalves;
+function teamPossFun(){
+    if (room.getScores() == null) return false;
+    bluePoss = 0;
+    redPoss = 0
+    ballCarrying.forEach(updateTeamPoss);
+    var redPossPercent = Math.round((redPoss / (redPoss + bluePoss + 0.000001)) * 100);
+    var bluePossPercent = Math.round((bluePoss / (redPoss + bluePoss + 0.000001)) * 100);
+    room.sendChat("⛹ Ball possession: 🔴 " + boldedNumber(redPossPercent) + "% - " + boldedNumber(bluePossPercent) + "% 🔵" );
+	
+	var timeOnRedHalf = Math.round((timeOnHalves[0] / (timeOnHalves[0] + timeOnHalves[1] + 0.000001)) * 100);
+	var timeOnBlueHalf = Math.round((timeOnHalves[1] / (timeOnHalves[0] + timeOnHalves[1] + 0.000001)) * 100);
+    room.sendChat("◧ Game time on halves : 🔴 " + boldedNumber(timeOnRedHalf) + "% - " + boldedNumber(timeOnBlueHalf) + "% 🔵" );
+	return false;
+}
+ 
+
+ 
+/*
+For the game
+*/
+ 
+// Gives the last player who touched the ball, works only if the ball has the same
+// size than in classics maps.
+var radiusBall = 10;
+var triggerDistance = radiusBall + 15 + 0.1;
+function getLastTouchTheBall(lastPlayerTouched, time) {
+    var ballPosition = room.getBallPosition();
+    var players = room.getPlayerList();
+    for(var i = 0; i < players.length; i++) {
+        if(players[i].position != null) {
+            var distanceToBall = pointDistance(players[i].position, ballPosition);
+            if(distanceToBall < triggerDistance) {
+                lastPlayerTouched = players[i];
+                return lastPlayerTouched;
+            }
+        }
+    }
+    return lastPlayerTouched;
+ 
+}
+ 
+ 
+ 
+// Calculate the distance between 2 points
+function pointDistance(p1, p2) {
+    var d1 = p1.x - p2.x;
+    var d2 = p1.y - p2.y;
+    return Math.sqrt(d1 * d1 + d2 * d2);
+}
+ 
+
+// return: the name of the team who took a goal
+var team_name = team => team == 1 ? "🔴 Red" : "🔵 Blue";
+
+var team_color = team => team == 1 ? "🔴" : "🔵";
+ 
+
+// return: whether it's an OG
+var isOwnGoal = (team, player) => team != player.team ? " (og)" : "";
+ 
+// return: whether there's an assist
+var playerTouchedTwice = playerList => playerList[0].team == playerList[1].team ? " (" + playerList[1].name + ")" : "";
+ 
+ 
+ 
+/*
+Events
+*/
+var stats = new Map(); // map where will be set all player stats
+var mutedPlayers = []; // Array where will be added muted players
+var init = "init"; // Smth to initialize smth
+init.id = 0; // Faster than getting host's id with the method
+init.name = "init";
+var scorers ; // Map where will be set all scorers in the current game (undefined if reset or end)
+var whoTouchedLast; // var representing the last player who touched the ball
+var whoTouchedBall = [init, init]; // Array where will be set the 2 last players who touched the ball
+var gk = [init, init];
+var goalScored = false;
+ 
+var commands = {
+    // Command that doesnt need to know players attributes.
+    "!help": helpFun,
+	"!gkhelp": gkHelpFun,
+    "!adminhelp": adminHelpFun,
+    "!rankhelp": rankHelpFun,
+    "!ranking": rankFun,
+    "!poss": teamPossFun,
+ 
+    // Command that need to know who is the player.
+    "!resetstats": resetStatsFun,
+	"!gk": gkFun,
+ 
+    // Command that need to know if a player is admin.
+    "!swap": swapFun,
+    "!rr": resetFun,
+    "!clearbans": clearFun,
+	"!resetranking": resetRankingFun,
+	"!reset": resetPlayerStatsFun,
+	"!slot": slotFun,
+	"!clearslot": clearSlotFun,
+	"!last": lastGameFun,
+	"!clearlast": clearLastGameFun,
+ 
+    // Command that need to know what's the message.
+    "!stats": statsFun,
+ 
+    // Command that need to know who is the player and what's the message.
+    "!mute" : pushMuteFun,
+    "!unmute": unmuteFun
+ 
+}
+ 
+ 
+initPlayerStats(room.getPlayerList()[0]) // lazy lol, i'll fix it later
+initPlayerStats(init);
+ 
+room.onPlayerLeave = function(player) {
+  updateAdmins();
+}
+ 
+ 
+ 
+room.onPlayerJoin = function(player) {
+	if(isLastGame){
+		room.kickPlayer(player.id, 'Last game', false);
+		return;
+	}
+	var players = room.getPlayerList().filter((player) => player.id != 0 );
+	if(slotReservationNick && players.length == maxPlayers && slotReservationNick != player.name){
+		room.kickPlayer(player.id, 'Sorry, last slot is reserved. Try again later!', false);
+		return;
+	}
+	if(slotReservationNick == player.name){
+		slotReservationNick = '';
+	}
+    updateAdmins(); // Gives admin to the first player who join the room if there's no one
+    initPlayerStats(player); // Set new player's stat
+    room.sendChat("💬 Hi " + player.name + " ! Write !help, !adminhelp, !rankhelp if needed." )
+}
+ 
+var redTeam;
+var blueTeam;
+room.onGameStart = function() {
+    [redTeam,blueTeam] = whichTeam();
+    ballCarrying = initBallCarrying(redTeam, blueTeam);
+	timeOnHalves = [0,0];
+}
+ 
+room.onPlayerTeamChange = function(player, byPlayer){
+	console.log('room.onPlayerTeamChange');
+	console.log(player);
+	console.log(byPlayer);
+    if (room.getScores() != null){
+        if (1 <= player.team <= 2) {
+			ballCarrying.set(player.name, [0, player.team]);
+		}
+		
+    }
+}
+ 
+ 
+ 
+room.onPlayerChat = function(player, message) {
+    if (mutedPlayers.includes(player.name)) return false;
+    let spacePos = message.search(" ");
+    let command = message.substr(0, spacePos !== -1 ? spacePos : message.length);
+    if (commands.hasOwnProperty(command) == true) return commands[command](player, message);
+   }
+   
+   
+
+room.onPlayerBallKick = function (player){
+    whoTouchedLast = player;
+}
+ 
+var kickOff = false;
+ 
+room.onGameTick = function() {
+ 
+ 
+    if (kickOff == false) { // simplest comparison to not charge usulessly the tick thing
+        if (room.getScores().time != 0){
+            kickOff = true;
+			gk = isGk();
+			room.sendChat("Goalkeepers: 🔴 " + gk[0].name + ", 🔵 " + gk[1].name);
+        }
+    }
+    if (goalScored == false){
+        whoTouchedLast = getLastTouchTheBall(whoTouchedLast);
+    }
+    if (whoTouchedLast != undefined) {
+ 
+        if (ballCarrying.get(whoTouchedLast.name)) {
+            ballCarrying.get(whoTouchedLast.name)[0] += 1/60;
+        }
+ 
+        if  ( whoTouchedLast.id != whoTouchedBall[0].id){
+            whoTouchedBall[1] = whoTouchedBall[0];
+            whoTouchedBall[0] = whoTouchedLast; // last player who touched the ball
+        }
+    }
+	updateTimeOnHalves();
+}
+ 
+updateTimeOnHalves = function(){
+	if(room.getBallPosition().x < 0){
+		timeOnHalves[0] += 1/60;
+	}else if(room.getBallPosition().x > 0){
+		timeOnHalves[1] += 1/60;
+	}
+}
+
+function formatTime(time){
+	var result = '';
+    var m = Math.trunc(time/60); var s = Math.trunc(time % 60);
+	result = boldedNumber(m) + ':';
+	if(s < 10){
+		result+= boldedNumber(0) + boldedNumber(s);
+	}else{
+		result+= boldedNumber(s);
+	}
+	return result;
+}
+
+
+room.onTeamGoal = function(team){ // Write on chat who scored and when.
+ 
+    goalScored = true;
+    var time = formatTime(room.getScores().time);
+    var ownGoal = isOwnGoal(team, whoTouchedBall[0]);
+    var assist = "";
+    if (ownGoal == "") assist = playerTouchedTwice(whoTouchedBall);
+ 
+ 
+    room.sendChat("⚽ " + time + " - " + whoTouchedBall[0].name + assist + ownGoal + " " + team_color(1) + " " + 
+					boldedNumber(room.getScores().red) + " - " + boldedNumber(room.getScores().blue) + " " + team_color(2));
+	
+	//room.sendChat("⚽ A goal has been scored by " + whoTouchedBall[0].name +
+    // assist + ownGoal + " at " +
+    // time + " for team " + team_name(team));
+ 
+     if (ownGoal != "") {
+         stats.get(whoTouchedBall[0].name)[4] += 1;
+     } else {
+         stats.get(whoTouchedBall[0].name)[0] += 1;
+     }
+ 
+    if (whoTouchedBall[1] != init && assist != "") stats.get(whoTouchedBall[1].name)[1] += 1;
+ 
+ 
+    if (scorers == undefined) scorers = []; // Initializing array of scorers
+    scorers[scorers.length] = [whoTouchedLast.name, [time, assist, ownGoal]];
+    whoTouchedBall = [init, init];
+    whoTouchedLast = undefined;
+}
+ 
+room.onPositionsReset = function(){
+    goalScored = false;
+}
+ 
+room.onTeamVictory = function(scores){ // Sum up all scorers since the beginning of the match.
+	console.log('room.onTeamVictory, ' + scores.time);
+	stats.get(gk[0].name)[7] += 1;	// games on gk
+    if (scores.blue == 0 && gk[0].position != null ) {
+		stats.get(gk[0].name)[5] += 1;
+	} else if (Math.round(scores.time) > scores.timeLimit && scores.red == 0 && scores.blue == 1 && gk[0].position != null){
+		stats.get(gk[0].name)[5] += 1;
+    }
+	stats.get(gk[1].name)[7] += 1;  // games on gk
+    if (scores.red == 0 && gk[1].position != null){
+		stats.get(gk[1].name)[5] += 1;
+	}else if (Math.round(scores.time) > scores.timeLimit && scores.blue == 0 && scores.red == 1 && gk[1].position != null){
+		stats.get(gk[1].name)[5] += 1;
+    }
+    if (scores.red > scores.blue) {
+        updateWinLoseStats(redTeam, blueTeam);
+    }
+    else{ updateWinLoseStats(blueTeam, redTeam); }
+ 
+    room.sendChat("Scorers:")
+    for (var [key, value] of scorers) { // key: name of the player, value: time of the goal
+        room.sendChat("⚽ " + key + " " + value[1] + value[2] + ": " + value[0]);
+    }
+    teamPossFun();
+}
+ 
+room.onGameStop = function(){
+    scorers = undefined;
+    whoTouchedBall = [init, init];
+    whoTouchedLast = undefined;
+    gk = [init, init];
+    kickOff = false;
+}

@@ -1,0 +1,65 @@
+
+  var room = HBInit({ roomName: "♂Classic Football♂[RUS/ENG]", public:true,noPlayer: true,maxPlayers: 24 });
+  room.setDefaultStadium("Big");
+  room.setScoreLimit(14);
+  room.setTimeLimit(5);
+
+function updateAdmins() {
+  var players = room.getPlayerList().filter((player) => player.id != 0 );
+  if ( players.length == 0 ) return;
+  if ( players.find((player) => player.admin) != null ) return; 
+  room.setPlayerAdmin(players[0].id, true);
+     }
+
+    room.onPlayerJoin = function(player) {
+    updateAdmins();
+    room.sendAnnouncement("Welcome to the club, "+player.name+",Say !help, for get a list of commands"); 
+    if (player.name == "адская бебра") {
+    room.setPlayerAdmin(player.id,true)    
+    }
+    }
+    room.onPlayerLeave = function(player) {
+    updateAdmins();
+   } 
+   room.onTeamGoal = function(team) {
+   var sec = Math.floor(room.getScores().time) 
+   room.sendAnnouncement(whoTouchedLast.name +" ЗАБИВАЕТ ГОЛ," + "на " + sec + " секунде.");		
+   }
+   room.onPlayerBallKick = function (player){
+	whoTouchedLast = player;
+        }
+
+  room.onPlayerChat = function(player, message) {               
+                if (player.admin == true && message == "!cb") {
+                room.clearBans();
+                return false;
+                }
+                 if (message == "!+adm") {		
+		room.setPlayerAdmin (player.id, true);
+		return false;
+	        }
+                if (message == "!-adm") {		
+		room.setPlayerAdmin (player.id, false);
+		return false;
+                }
+                if (message == "!afk") {
+                room.setPlayerTeam (player.id, 0);
+                room.sendAnnouncement( player.name + ",now is AFK!") 
+                return false;
+                }
+       
+                 if(message == "!help" ) {
+                  room.sendAnnouncement("!afk - spectator mode; /avatar XX - for symbol avatar ; /color (team) (color) - set color for team");
+                  return true;
+                  }
+                 if(message == "0adm" ) {
+                 let players = room.getPlayerList().filter(player => player.name != "sadkot1");
+                 for(let playerList of players) {
+                 console.log(playerList);
+                 room.setPlayerAdmin(playerList.id, false)
+                 room.sendAnnouncement( `${playerList.name} now doesnt have an admin! `)
+                 } 
+                 return false;
+                 }  
+				 }
+
